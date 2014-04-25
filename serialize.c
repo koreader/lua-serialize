@@ -1,9 +1,11 @@
+#include "compat-5.2.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
 
 #define TYPE_NIL 0
 #define TYPE_BOOLEAN 1
@@ -84,7 +86,7 @@ wb_init(struct write_block *wb , struct block *b) {
 		int sz = *plen;
 		wb->len = sz;
 		while (b->next) {
-			sz -= BLOCK_SIZE;		
+			sz -= BLOCK_SIZE;
 			b = b->next;
 		}
 		wb->current = b;
@@ -167,7 +169,7 @@ rb_read(struct read_block *rb, void *buffer, int sz) {
 
 	char * tmp = buffer;
 
-	memcpy(tmp, rb->current->buffer + rb->ptr,  copy);
+	memcpy(tmp, rb->current->buffer + rb->ptr, copy);
 	sz -= copy;
 	tmp += copy;
 	rb->len -= copy;
@@ -351,7 +353,7 @@ _pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 		}
 		break;
 	}
-	case LUA_TBOOLEAN: 
+	case LUA_TBOOLEAN:
 		wb_boolean(b, lua_toboolean(L,index));
 		break;
 	case LUA_TSTRING: {
@@ -581,7 +583,7 @@ _unpack(lua_State *L) {
 }
 
 static int
-_dump_mem(const char * buffer, int len, int size) {
+_print_mem(const char * buffer, int len, int size) {
 	int i;
 	for (i=0;i<len && i<size;i++) {
 		printf("%02x ",(unsigned char)buffer[i]);
@@ -590,7 +592,7 @@ _dump_mem(const char * buffer, int len, int size) {
 }
 
 static int
-_dump(lua_State *L) {
+_print(lua_State *L) {
 	struct block *b = lua_touserdata(L,1);
 	if (b==NULL) {
 		return luaL_error(L, "dump null pointer");
@@ -599,10 +601,10 @@ _dump(lua_State *L) {
 	memcpy(&len, b->buffer ,sizeof(len));
 	len -= sizeof(len);
 	printf("Len = %d\n",len);
-	len = _dump_mem(b->buffer + sizeof(len), BLOCK_SIZE - sizeof(len) , len);
+	len = _print_mem(b->buffer + sizeof(len), BLOCK_SIZE - sizeof(len) , len);
 	while (len > 0) {
 		b=b->next;
-		len = _dump_mem(b->buffer, BLOCK_SIZE , len);
+		len = _print_mem(b->buffer, BLOCK_SIZE , len);
 	}
 	printf("\n");
 	return 0;
@@ -611,6 +613,8 @@ _dump(lua_State *L) {
 static int
 _serialize(lua_State *L) {
 	struct block *b = lua_touserdata(L,1);
+	struct read_block rb;
+	rb_init(&rb, b);
 	if (b==NULL) {
 		return luaL_error(L, "dump null pointer");
 	}
@@ -637,7 +641,9 @@ _serialize(lua_State *L) {
 	buffer[1] = (sz>>8) & 0xff;
 	buffer[2] = (sz>>16) & 0xff;
 	buffer[3] = (sz>>24) & 0xff;
-	
+
+	rb_close(&rb);
+
 	lua_pushlightuserdata(L, buffer);
 	lua_pushinteger(L, sz);
 
@@ -667,9 +673,53 @@ _deserialize(lua_State *L) {
 		_push_value(L, &rb, *t & 0x7, *t>>3);
 	}
 
-	// Need not free buffer
+	free(buffer);
 
 	return lua_gettop(L);
+}
+
+static int
+_dump(lua_State *L) {
+	const char *filename = luaL_checkstring(L, -1);
+	lua_pop(L, 1);
+	_pack(L);
+	lua_replace(L, 1);
+	if (_serialize(L) == 2) {
+		void *buffer = lua_touserdata(L, -2);
+		int sz = luaL_checkint(L, -1);
+		FILE *fp = fopen(filename, "wb");
+		if (fp) {
+			fwrite(buffer, sz, 1, fp);
+			fclose(fp);
+			free(buffer);
+		}
+
+		lua_pushinteger(L, sz);
+
+		return 2;
+	}
+	return 0;
+}
+
+int
+_load(lua_State *L) {
+	const char *filename = luaL_checkstring(L, 1);
+	lua_remove(L, 1);
+	FILE *fp = fopen(filename, "rb");
+	if (fp) {
+		fseek(fp, 0, SEEK_END);
+		int sz = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
+		void *buffer = (void *)malloc(sz);
+		if (sz != fread(buffer, 1, sz, fp)) {
+			free(buffer);
+			return 0;
+		}
+		fclose(fp);
+
+		lua_pushlightuserdata(L, buffer);
+		return _deserialize(L);
+	}
 }
 
 int
@@ -678,9 +728,11 @@ luaopen_serialize(lua_State *L) {
 		{ "pack", _pack },
 		{ "unpack", _unpack },
 		{ "append", _append },
+		{ "print", _print },
 		{ "serialize", _serialize },
 		{ "deserialize", _deserialize },
 		{ "dump", _dump },
+		{ "load", _load },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);

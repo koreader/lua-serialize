@@ -1,0 +1,15 @@
+# editorconfig.org
+root = true
+
+[*.md]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
+indent_size = 8
+
+[*.c]
+indent_style = tab
+indent_size = 4
