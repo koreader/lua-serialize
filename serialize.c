@@ -446,7 +446,9 @@ _get_number(lua_State *L, struct read_block *rb, int cookie) {
 		double * pn = rb_read(rb,&n,8);
 		if (pn == NULL)
 			_invalid_stream(L,rb);
-		return *pn;
+		// fix dereference of unaligned double pointer on ARM CPU
+		memcpy(&n, (void*)pn, sizeof(double));
+		return n;
 	}
 	default:
 		_invalid_stream(L,rb);
