@@ -12,7 +12,7 @@ OBJS=$(SRCS:%.c=%.o)
 CFLAGS=-I$(LUA_DIR)/src -I$(COMPAT_DIR)/c-api \
        -L$(OUTPUT_DIR) -shared -fPIC -Wl,-E -Wl,-rpath,'$$ORIGIN'
 
-LDFLAGS=-lluacompat52
+LDFLAGS=
 
 all: $(OUTPUT_DIR) lua-src libs
 
@@ -34,8 +34,8 @@ libs: \
 	$(OUTPUT_DIR)/serialize.so
 
 $(OUTPUT_DIR)/libluacompat52.so: $(COMPAT_DIR)/c-api/compat-5.2.c
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 $(OUTPUT_DIR)/serialize.so: $(SRC_DIR)/serialize.c
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $< -lluacompat52 $(LDFLAGS)
 
