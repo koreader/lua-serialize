@@ -148,7 +148,8 @@ rb_read(struct read_block *rb, void *buffer, int sz) {
 		int ptr = rb->ptr;
 		rb->ptr += sz;
 		rb->len -= sz;
-		return rb->buffer + ptr;
+		memcpy(buffer, rb->buffer + ptr, sz);
+		return buffer;
 	}
 
 	if (rb->ptr == BLOCK_SIZE) {
@@ -161,10 +162,10 @@ rb_read(struct read_block *rb, void *buffer, int sz) {
 	int copy = BLOCK_SIZE - rb->ptr;
 
 	if (sz <= copy) {
-		void * ret = rb->current->buffer + rb->ptr;
+		memcpy(buffer, rb->current->buffer + rb->ptr, sz);
 		rb->ptr += sz;
 		rb->len -= sz;
-		return ret;
+		return buffer;
 	}
 
 	char * tmp = buffer;
@@ -446,9 +447,7 @@ _get_number(lua_State *L, struct read_block *rb, int cookie) {
 		double * pn = rb_read(rb,&n,8);
 		if (pn == NULL)
 			_invalid_stream(L,rb);
-		// fix dereference of unaligned double pointer on ARM CPU
-		memcpy(&n, (void*)pn, sizeof(double));
-		return n;
+		return *pn;
 	}
 	default:
 		_invalid_stream(L,rb);
@@ -468,9 +467,14 @@ _get_pointer(lua_State *L, struct read_block *rb) {
 
 static void
 _get_buffer(lua_State *L, struct read_block *rb, int len) {
-	char tmp[len];
+	char *tmp = (char *)malloc(len);
 	char * p = rb_read(rb,tmp,len);
+	if (p == NULL) {
+		free(tmp);
+		_invalid_stream(L,rb);
+	}
 	lua_pushlstring(L,p,len);
+	free(tmp);
 }
 
 static void _unpack_one(lua_State *L, struct read_block *rb);
