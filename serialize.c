@@ -672,6 +672,59 @@ _deserialize(lua_State *L) {
 	return lua_gettop(L);
 }
 
+static int
+_readserifile(lua_State *L) {
+	const char *fname = lua_tostring(L,1);
+	if (fname==NULL) {
+		return luaL_error(L, "fname null pointer");
+	}
+	FILE* file = fopen(fname,"rb");
+	if (file==NULL) {
+		return luaL_error(L, "file null pointer");
+	}
+	fseek( file,0L,SEEK_END );
+	uint32_t len = ftell( file );
+	if (len <= 0) {
+		return luaL_error(L, "file empty");
+	}
+	uint8_t * buffer = malloc(len);
+	fseek( file,0L,SEEK_SET);
+	fread(buffer, len, 1, file); 
+	if (ftell(file) != len){
+		return luaL_error(L, "read error");
+	}
+	fclose(file);
+	
+	lua_pushlightuserdata(L, buffer);
+	lua_pushinteger(L, len);
+
+	return 2;
+}
+
+static int
+_writeserifile(lua_State *L) {
+	const char *fname = lua_tostring(L,1);
+	if (fname==NULL) {
+		return luaL_error(L, "fname null pointer");
+	}
+	FILE* file = fopen(fname,"wb");
+	if (file==NULL) {
+		return luaL_error(L, "file null pointer");
+	}
+	uint32_t len = lua_tointeger(L,2);
+	if (len <= 0) {
+		return luaL_error(L, "file empty");
+	}
+	void * buffer = lua_touserdata(L,3);
+	if (buffer == NULL) {
+		return luaL_error(L, "deserialize null pointer");
+	}
+	fwrite(buffer, len, 1, file);      
+	fclose(file);
+	
+	return 0;
+}
+
 int
 luaopen_serialize(lua_State *L) {
 	luaL_Reg l[] = {
@@ -680,6 +733,8 @@ luaopen_serialize(lua_State *L) {
 		{ "append", _append },
 		{ "serialize", _serialize },
 		{ "deserialize", _deserialize },
+		{ "readserifile", _readserifile},
+		{ "writeserifile",_writeserifile},
 		{ "dump", _dump },
 		{ NULL, NULL },
 	};
