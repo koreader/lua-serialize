@@ -29,13 +29,14 @@ lua-src:
 		&& wget http://www.lua.org/ftp/lua-5.1.5.tar.gz || true
 	tar zxf $(LUA_SRC)
 
-libs: \
-	$(OUTPUT_DIR)/libluacompat52.so \
-	$(OUTPUT_DIR)/serialize.so
+LIBLUACOMPAT52=$(OUTPUT_DIR)/libluacompat52.$(if $(WIN32),dll,so)
+LIBSERIALIZE=$(OUTPUT_DIR)/serialize.$(if $(WIN32),dll,so)
 
-$(OUTPUT_DIR)/libluacompat52.so: $(COMPAT_DIR)/c-api/compat-5.2.c
+libs: $(LIBLUACOMPAT52) $(LIBSERIALIZE)
+
+$(LIBLUACOMPAT52): $(COMPAT_DIR)/c-api/compat-5.2.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-$(OUTPUT_DIR)/serialize.so: $(SRC_DIR)/serialize.c
+$(LIBSERIALIZE): $(SRC_DIR)/serialize.c
 	$(CC) $(CFLAGS) -o $@ $< -lluacompat52 $(LDFLAGS)
 
