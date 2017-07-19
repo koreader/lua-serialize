@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-project(proxy VERSION 3.0)
+project(lua-serialize VERSION 3.0)
 
 add_library(serialize SHARED serialize.c)
 
